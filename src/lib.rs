@@ -53,7 +53,7 @@ use std::io::{self, Write};
 extern crate terminal_size;
 use terminal_size::{terminal_size, Width};
 
-/// Struct that used for presenting progress bar with plain texts.
+/// A builder that used for creating customize progress bar.
 ///
 /// # Examples
 ///
@@ -62,13 +62,122 @@ use terminal_size::{terminal_size, Width};
 ///
 /// extern crate progress;
 ///
-/// let bar = progress::Bar::new();
+/// fn main() {
+///     let mut bar = progress::BarBuilder::new()
+///         .left_cap("<")
+///         .right_cap(">")
+///         .empty_symbol("-")
+///         .filled_symbol("/")
+///         .build();
 ///
-/// bar.set_job_title("Working...");
+///     bar.set_job_title("Meow...");
 ///
-/// for i in 0..11 {
-///     thread::sleep_ms(100);
-///     bar.reach_percent(i * 10);
+///     for i in 0..11 {
+///         thread::sleep_ms(500);
+///         bar.reach_percent(i * 10);
+///     }
+/// }
+pub struct BarBuilder {
+    _left_cap: Option<String>,
+    _right_cap: Option<String>,
+    _filled_symbol: Option<String>,
+    _empty_symbol: Option<String>,
+}
+
+impl BarBuilder {
+    /// Create a new progress bar builder.
+    pub fn new() -> BarBuilder {
+        BarBuilder {
+            _left_cap: None,
+            _right_cap: None,
+            _filled_symbol: None,
+            _empty_symbol: None,
+        }
+    }
+
+    /// Set desired symbol used as left cap
+    ///
+    /// ```shell
+    /// [=========-] 90%
+    /// ^
+    pub fn left_cap(&mut self, symbol: &str) -> &mut BarBuilder {
+        self._left_cap = Some(symbol.to_string());
+
+        self
+    }
+
+    /// Set desired symbol used as right cap
+    ///
+    /// ```shell
+    /// [=========-] 90%
+    ///            ^
+    pub fn right_cap(&mut self, symbol: &str) -> &mut BarBuilder {
+        self._right_cap = Some(symbol.to_string());
+
+        self
+    }
+
+    /// Set desired symbol used as filled bar
+    ///
+    /// ```shell
+    /// [=========-] 90%
+    ///  ^^^^^^^^^
+    pub fn filled_symbol(&mut self, symbol: &str) -> &mut BarBuilder {
+        self._filled_symbol = Some(symbol.to_string());
+
+        self
+    }
+
+    /// Set desired symbol used as empty bar
+    ///
+    /// ```shell
+    /// [=========-] 90%
+    ///           ^
+    ///  ```
+    pub fn empty_symbol(&mut self, symbol: &str) -> &mut BarBuilder {
+        self._empty_symbol = Some(symbol.to_string());
+
+        self
+    }
+
+    /// Build progress bar according to previous configurations.
+    pub fn build(&mut self) -> Bar {
+        // XXX Does `take()` appropriate way?
+        Bar {
+            _job_title: String::new(),
+            _progress_percentage: 0,
+            _left_cap: self._left_cap.take().unwrap_or(String::from("[")),
+            _right_cap: self._right_cap.take().unwrap_or(String::from("]")),
+            _filled_symbol: self._filled_symbol.take().unwrap_or(String::from("=")),
+            _empty_symbol: self._empty_symbol.take().unwrap_or(String::from("-")),
+        }
+    }
+}
+
+/// Struct that used for presenting progress bar with plain texts.
+///
+/// It looks like:
+///
+/// ```shell
+/// Doing something            [===-------] 70%
+/// ```
+///
+/// # Examples
+///
+/// ```
+/// use std::thread;
+///
+/// extern crate progress;
+///
+/// fn main() {
+///     let bar = progress::Bar::new();
+///
+///     bar.set_job_title("Working...");
+///
+///     for i in 0..11 {
+///         thread::sleep_ms(100);
+///         bar.reach_percent(i * 10);
+///     }
 /// }
 pub struct Bar {
     _job_title: String,
@@ -157,5 +266,177 @@ impl Bar {
         }
         print!("{}", self._right_cap);
         print!("{:>4}%", self._progress_percentage);
+    }
+}
+
+/// Struct that used for presenting progress with plain texts.
+///
+/// It looks like:
+///
+/// ```shell
+/// Doing something
+/// ```
+///
+/// # Examples
+///
+/// ```
+/// use std::thread;
+///
+/// extern crate progress;
+///
+/// fn main() {
+///     let mut text = progress::Text::new();
+///
+///     text.set_job_title("Drawing...");
+///     thread::sleep_ms(1000);
+///
+///     text.set_job_title("Painting...");
+///     thread::sleep_ms(1000);
+///
+///     text.set_job_title("Sleeping zzz");
+///     thread::sleep_ms(1000);
+///
+///     text.set_job_title("Wait! Is that a nyan cat?");
+///     thread::sleep_ms(1000);
+///
+///     text.set_job_title("This must be my dream zzzzzz");
+///     thread::sleep_ms(1000);
+///
+///     text.jobs_done();
+/// }
+pub struct Text {
+    _job_title: String,
+}
+
+impl Text {
+    /// Create a new progress text.
+    pub fn new() -> Text {
+        Text {
+            _job_title: String::new(),
+        }
+    }
+
+    /// Set text shown in progress text.
+    pub fn set_job_title(&mut self, new_title: &str) {
+        self._job_title.clear();
+        self._job_title.push_str(new_title);
+        self._show_progress();
+    }
+
+    /// Tell progress::Text everything has been done. Also prints "\n".
+    pub fn jobs_done(&self) {
+        print!("\n");
+    }
+}
+
+impl Text {
+    fn _show_progress(& self) {
+        io::stdout().flush().unwrap();
+        print!("\r");
+        // TODO How to handle extra text?
+        print!("{:<81}", self._job_title);
+    }
+}
+
+/// Struct that used for presenting progress with plain texts.
+///
+/// It looks like:
+///
+/// ```shell
+/// * Doing something
+/// / Doing another thing
+/// ```
+///
+/// # Examples
+///
+/// ```
+/// use std::thread;
+///
+/// extern crate progress;
+///
+/// fn main() {
+///     let mut spinningCircle = progress::SpinningCircle::new();
+///
+///     spinningCircle.set_job_title("Writing boring and stupid homeworks");
+///     for _ in 0..50 {
+///         thread::sleep_ms(50);
+///         spinningCircle.tick();
+///     }
+///     spinningCircle.jobs_done();
+///
+///     spinningCircle.set_job_title("Previewing boring and stupid subjects");
+///     for _ in 0..50 {
+///         thread::sleep_ms(50);
+///         spinningCircle.tick();
+///     }
+///     spinningCircle.jobs_done();
+///
+///     spinningCircle.set_job_title("Learning and creating interesting programs");
+///     for _ in 0..50 {
+///         thread::sleep_ms(50);
+///         spinningCircle.tick();
+///     }
+///     spinningCircle.jobs_done();
+/// }
+pub struct SpinningCircle {
+    _job_title: String,
+    _circle_symbols: Vec<char>,
+    _finished_symbol: char,
+    _tick_count: usize,
+}
+
+impl SpinningCircle {
+    /// Create a new progress spinning circle.
+    pub fn new() -> SpinningCircle {
+        SpinningCircle {
+            _job_title: String::new(),
+            _circle_symbols: vec!['|', '/', '-', '\\'],
+            _finished_symbol: '*',
+            _tick_count: 0,
+        }
+    }
+
+    /// Set text shown in progress spinning circle.
+    pub fn set_job_title(&mut self, new_title: &str) {
+        self._job_title.clear();
+        self._job_title.push_str(new_title);
+        self._show_progress();
+    }
+
+    /// Tell spinning circle to spin a bit.
+    pub fn tick(&mut self) {
+        self._tick_count += 1;
+        self._show_progress();
+    }
+
+    /// Print finished symbol at the position spinning circle symbol used to be.
+    /// And print "\n" to jump to next line.
+    ///
+    /// e.g.
+    /// * Collection kitties
+    pub fn jobs_done(& self) {
+        self._show_finished();
+    }
+}
+
+impl SpinningCircle {
+    fn _print_symbol_and_texts(& self, symbol: &char) {
+        io::stdout().flush().unwrap();
+        print!("\r");
+        print!("{}", symbol);
+        // TODO How to handle extra text?
+        print!(" {:<81}", self._job_title);
+    }
+
+    fn _show_progress(& self) {
+        let circle_symbol: &char = self._circle_symbols.get(
+            self._tick_count % self._circle_symbols.len()).unwrap();
+
+        self._print_symbol_and_texts(circle_symbol);
+    }
+
+    fn _show_finished(& self) {
+        self._print_symbol_and_texts(&self._finished_symbol);
+        print!("\n");
     }
 }
